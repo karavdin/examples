@@ -22,6 +22,7 @@ from tflite_support.task import processor
 from tflite_support.task import vision
 import utils
 
+from picamera2 import Picamera2, Preview
 
 def run(model: str, camera_id: int, width: int, height: int, num_threads: int,
         enable_edgetpu: bool) -> None:
@@ -41,9 +42,9 @@ def run(model: str, camera_id: int, width: int, height: int, num_threads: int,
   start_time = time.time()
 
   # Start capturing video input from the camera
-  cap = cv2.VideoCapture(camera_id)
-  cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-  cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+  #cap = cv2.VideoCapture(camera_id)
+  #cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+  #cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
   # Visualization parameters
   row_size = 20  # pixels
@@ -63,19 +64,32 @@ def run(model: str, camera_id: int, width: int, height: int, num_threads: int,
   detector = vision.ObjectDetector.create_from_options(options)
 
   # Continuously capture images from the camera and run inference
-  while cap.isOpened():
-    success, image = cap.read()
-    if not success:
-      sys.exit(
-          'ERROR: Unable to read from webcam. Please verify your webcam settings.'
-      )
+  normalSize = (640, 640)
+  lowresSize = (320, 240) 
+  picam2 = Picamera2()
+  #picam2.start_preview(Preview.QTGL)
+  config = picam2.create_preview_configuration(main={"size": normalSize},
+                                                 lores={"size": lowresSize})
+  picam2.configure(config)
+  #stride = picam2.stream_configuration("lores")["stride"]
+  #picam2.post_callback = DrawRectangles
+  picam2.start()
+  while True:
+    image = picam2.capture_array()
+
+  #while cap.isOpened():
+  #  success, image = cap.read()
+  #  if not success:
+  #    sys.exit(
+  #        'ERROR: Unable to read from webcam. Please verify your webcam settings.'
+  #    )
 
     counter += 1
     image = cv2.flip(image, 1)
 
     # Convert the image from BGR to RGB as required by the TFLite model.
-    rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
+    #rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    rgb_image = image #picamera2 seems to give RGB image already
     # Create a TensorImage object from the RGB image.
     input_tensor = vision.TensorImage.create_from_array(rgb_image)
 
@@ -102,7 +116,7 @@ def run(model: str, camera_id: int, width: int, height: int, num_threads: int,
       break
     cv2.imshow('object_detector', image)
 
-  cap.release()
+  #cap.release()
   cv2.destroyAllWindows()
 
 
